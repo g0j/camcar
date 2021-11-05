@@ -3,7 +3,7 @@
 # project subdirectory.
 #
 
-PROJECT_NAME := app-template
+PROJECT_NAME := camcar
 
 include $(IDF_PATH)/make/project.mk
 
