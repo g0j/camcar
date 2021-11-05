@@ -10,7 +10,7 @@
 #include "esp_camera.h"
 
 #include "leds.h"
-#include "driver/gpio.h"
+#include "wifi.h"
 
 #define BOARD_ESP32CAM_AITHINKER
 
@@ -36,7 +36,7 @@
 
 #endif
 
-static const char *TAG = "example:take_picture";
+static const char *CAMERA_TAG = "example:take_picture";
 
 static camera_config_t camera_config = {
     .pin_pwdn = CAM_PIN_PWDN,
@@ -76,11 +76,28 @@ static esp_err_t init_camera()
     esp_err_t err = esp_camera_init(&camera_config);
     if (err != ESP_OK)
     {
-        ESP_LOGE(TAG, "Camera Init Failed");
+        ESP_LOGE(CAMERA_TAG, "Camera Init Failed");
         return err;
     }
 
     return ESP_OK;
+}
+
+static esp_err_t init_wifi()
+{
+    //Initialize NVS
+    esp_err_t ret = nvs_flash_init();
+    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND)
+    {
+        ESP_ERROR_CHECK(nvs_flash_erase());
+        ret = nvs_flash_init();
+    }
+    ESP_ERROR_CHECK(ret);
+
+    ESP_LOGI(WIFI_TAG, "ESP_WIFI_MODE_STA");
+    wifi_init_sta();
+
+    return ret;
 }
 
 void app_main()
@@ -93,15 +110,20 @@ void app_main()
         return;
     }
 
+    if (ESP_OK != init_wifi())
+    {
+        return;
+    }
+
     while (1)
     {
-        ESP_LOGI(TAG, "Taking picture...");
+        ESP_LOGI(CAMERA_TAG, "Taking picture...");
         gpio_set_level(LED_LAMP, LED_ON);
         vTaskDelay(200 / portTICK_RATE_MS);
         camera_fb_t *pic = esp_camera_fb_get();
 
         // use pic->buf to access the image
-        ESP_LOGI(TAG, "Picture taken! Its size was: %zu bytes", pic->len);
+        ESP_LOGI(CAMERA_TAG, "Picture taken! Its size was: %zu bytes", pic->len);
         esp_camera_fb_return(pic);
         gpio_set_level(LED_LAMP, LED_OFF);
 
