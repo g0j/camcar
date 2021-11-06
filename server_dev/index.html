@@ -1,0 +1,183 @@
+<!doctype html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title id="title">ESP32-CAM Simplified View</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
+  <link rel="stylesheet" type="text/css" href="style.css">
+  <style>
+    @media (min-width: 800px) and (orientation:landscape) {
+      #content {
+        display: flex;
+        flex-wrap: nowrap;
+        flex-direction: column;
+        align-items: flex-start;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <section class="main">
+      <button id="toggle-stream" style="float:left;">Start Stream</button>
+      <input type="checkbox" id="nav-toggle-cb">
+        <div class="input-group" id="lamp-group" width="100px">
+          <label for="lamp">Light</label>
+          <div class="range-min">Off</div>
+          <input type="range" id="lamp" min="0" max="100" value="0" class="action-setting">
+          <div class="range-max">Full</div>
+        </div>
+        <!-- Hide the next entries, they are present in the body so that we
+                  can pass settings to/from them for use in the scripting, not for user setting -->
+        <div id="rotate" class="action-setting"></div>
+        <div id="cam_name" class="action-setting"></div>
+        <div id="stream_url" class="action-setting hidden"></div>
+      <figure>
+        <div id="stream-container" class="image-container hidden">
+          <div class="close close-rot-none" id="close-stream">×</div>
+          <img id="stream" src="">
+        </div>
+      </figure>
+  </section>
+</body>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function (event) {
+    var baseHost = document.location.origin;
+    
+    var streamURL = baseHost + '/ws';
+
+    const view = document.getElementById('stream')
+    const viewContainer = document.getElementById('stream-container')
+    const streamButton = document.getElementById('toggle-stream')
+
+    const hide = el => {
+      el.classList.add('hidden')
+    }
+    const show = el => {
+      el.classList.remove('hidden')
+    }
+
+    const disable = el => {
+      el.classList.add('disabled')
+      el.disabled = true
+    }
+
+    const enable = el => {
+      el.classList.remove('disabled')
+      el.disabled = false
+    }
+
+
+    var rangeUpdateScheduled = false
+    var latestRangeConfig
+    
+    function updateRangeConfig (el) {
+      latestRangeConfig = el
+      if (!rangeUpdateScheduled) {
+        rangeUpdateScheduled = true;
+        setTimeout(function(){
+          rangeUpdateScheduled = false
+          updateConfig(latestRangeConfig)
+        }, 150);
+      }
+    }
+
+    function updateConfig(el) {
+      let value
+      switch (el.type) {
+        case 'checkbox':
+          value = el.checked ? 1 : 0
+          break
+        case 'range':
+        case 'select-one':
+          value = el.value
+          break
+        case 'button':
+        case 'submit':
+          value = '1'
+          break
+        default:
+          return
+      }
+
+      const query = `${baseHost}/control?var=${el.id}&val=${value}`
+
+      fetch(query)
+        .then(response => {
+          console.log(`request to ${query} finished, status: ${response.status}`)
+        })
+    }
+
+    const stopStream = () => {
+      window.stop();
+      streamButton.innerHTML = 'Start Stream';
+      streamButton.setAttribute("title", `Start the stream :: ${streamURL}`);
+      hide(viewContainer);
+    }
+
+    const startStream = () => {
+      view.src = streamURL;
+      view.scrollIntoView(false);
+      streamButton.innerHTML = 'Stop Stream';
+      streamButton.setAttribute("title", `Stop the stream`);
+      show(viewContainer);
+    }
+
+    const applyRotation = () => {
+      rot = rotate.value;
+      if (rot == -90) {
+        viewContainer.style.transform = `rotate(-90deg)  translate(-100%)`;
+        closeButton.classList.remove('close-rot-none');
+        closeButton.classList.remove('close-rot-right');
+        closeButton.classList.add('close-rot-left');
+      } else if (rot == 90) {
+        viewContainer.style.transform = `rotate(90deg) translate(0, -100%)`;
+        closeButton.classList.remove('close-rot-left');
+        closeButton.classList.remove('close-rot-none');
+        closeButton.classList.add('close-rot-right');
+      } else {
+        viewContainer.style.transform = `rotate(0deg)`;
+        closeButton.classList.remove('close-rot-left');
+        closeButton.classList.remove('close-rot-right');
+        closeButton.classList.add('close-rot-none');
+      }
+      console.log('Rotation ' + rot + ' applied');
+    }
+
+    streamButton.onclick = () => {
+      const streamEnabled = streamButton.innerHTML === 'Stop Stream'
+      if (streamEnabled) {
+        stopStream();
+      } else {
+        startStream();
+      }
+    }
+
+    // Attach default on change action
+    document
+      .querySelectorAll('.action-setting')
+      .forEach(el => {
+        el.onchange = () => updateConfig(el)
+      })
+
+    // Update range sliders as they are being moved
+    document
+      .querySelectorAll('input[type="range"]')
+      .forEach(el => {
+        el.oninput = () => updateRangeConfig(el)
+      })
+
+    // Custom actions
+    // Detection and framesize
+    rotate.onchange = () => {
+      applyRotation();
+      updateConfig(rotate);
+    }
+  })
+</script>
+
+</html>
